@@ -2,16 +2,26 @@
 
 import Button from "@/app/components/Button";
 import Input from "@/app/components/inputs/Input";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import AuthSocialButton from "./AuthSocialButton";
 import { BsGithub, BsGoogle, BsLinkedin } from "react-icons/bs";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { signIn, useSession } from "next-auth/react";
 
 type Variant = "LOGIN" | "Register";
 
 const AuthForm = () => {
+  const session = useSession();
   const [variant, setVariant] = useState<Variant>("LOGIN");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (session?.status == "authenticated") {
+      console.log("Authenticated", session.data.user?.name);
+    }
+  }, [session?.status]);
 
   const toggleVariant = useCallback(() => {
     if (variant == "LOGIN") {
@@ -36,16 +46,41 @@ const AuthForm = () => {
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
     if (variant == "REGISTER") {
-      //Axios Register
+      axios
+        .post("/api/register", data)
+        .catch(() => toast.error("Something went wrong!"))
+        .finally(() => setIsLoading(false));
     }
     if (variant == "LOGIN") {
-      //NextAuth Login
+      signIn("credentials", {
+        ...data,
+        redirect: false,
+      })
+        .then((callback) => {
+          if (callback?.error) {
+            toast.error("Invalid Credentials");
+          }
+
+          if (callback?.ok && !callback?.error) {
+            toast.success("Logged in!");
+          }
+        })
+        .finally(() => setIsLoading(false));
     }
   };
   const socialAction = (action: string) => {
     setIsLoading(true);
 
-    //NextAuth Social Signin
+    signIn(action, { redirect: false })
+      .then((callback) => {
+        if (callback?.error) {
+          toast.error("Invalid Credentials");
+        }
+        if (callback?.ok && !callback?.error) {
+          toast.success("Logged in!");
+        }
+      })
+      .finally(() => setIsLoading(false));
   };
   return (
     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -53,8 +88,8 @@ const AuthForm = () => {
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {variant == "REGISTER" && (
             <Input
-              id="email"
-              label="Email"
+              id="name"
+              label="Name"
               register={register}
               errors={errors}
               disabled={isLoading}
